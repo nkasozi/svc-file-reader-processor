@@ -5,17 +5,17 @@ use actix_web::{
 };
 
 use crate::internal::{
-    interfaces::reconstruct_file_service::ReconstructFileServiceInterface,
-    models::view_models::requests::reconstruct_file_from_chunks_request::ReconstructFileFromChunksRequest,
+    interfaces::split_file_service::SplitFileServiceInterface,
+    models::view_models::requests::split_file_request::SplitFileRequest,
     shared_reconciler_rust_libraries::models::entities::app_errors::AppErrorKind,
 };
 
-#[post("/reconstruct-file")]
-async fn reconstruct_file(
-    task_details: web::Json<ReconstructFileFromChunksRequest>,
-    service: Data<Box<dyn ReconstructFileServiceInterface>>,
+#[post("/read-file")]
+async fn read_file(
+    task_details: web::Json<SplitFileRequest>,
+    service: Data<Box<dyn SplitFileServiceInterface>>,
 ) -> HttpResponse {
-    let recon_task_details = service.rebuild_file(task_details.0).await;
+    let recon_task_details = service.split_file_into_chunks(task_details.0).await;
 
     return match recon_task_details {
         Ok(details) => HttpResponse::Ok().json(details),

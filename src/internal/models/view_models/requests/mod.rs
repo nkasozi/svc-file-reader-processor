@@ -1,1 +1,2 @@
-pub mod reconstruct_file_from_chunks_request;
+pub mod split_file_request;
+pub mod upload_file_chunk_request;

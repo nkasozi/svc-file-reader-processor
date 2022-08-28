@@ -1,19 +1,15 @@
 use mockall::automock;
 
-use crate::internal::shared_reconciler_rust_libraries::models::entities::{
-    file_upload_chunk::FileUploadChunk, reconstructed_file::ReconstructedFile,
+use crate::internal::{
+    models::view_models::requests::upload_file_chunk_request::UploadFileChunkRequest,
+    shared_reconciler_rust_libraries::models::entities::file::FileThatHasBeenRead,
 };
 
 #[automock]
 pub trait TransformerInterface: Send + Sync {
-    fn put_file_chunk_in_correct_position_in_reconstructed_file(
+    fn group_rows_into_file_chunks(
         &self,
-        file_upload_chunk: &FileUploadChunk,
-        reconstructed_file: &mut ReconstructedFile,
-    ) -> ReconstructedFile;
-
-    fn create_new_reconstructed_file(
-        &self,
-        file_upload_chunk: &FileUploadChunk,
-    ) -> ReconstructedFile;
+        file_that_has_been_read: &FileThatHasBeenRead,
+        max_group_size: i64,
+    ) -> Vec<UploadFileChunkRequest>;
 }

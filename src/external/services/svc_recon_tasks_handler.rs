@@ -3,44 +3,45 @@ use dapr::{dapr::dapr::proto::runtime::v1::dapr_client::DaprClient, Client};
 use tonic::transport::Channel as TonicChannel;
 
 use crate::internal::{
-    interfaces::recon_results_repository::ReconResultsRepositoryInterface,
+    interfaces::svc_recon_tasks_handler::ReconTasksHandlerInterface,
     shared_reconciler_rust_libraries::models::entities::{
         app_errors::{AppError, AppErrorKind},
-        reconstructed_file::ReconstructedFile,
+        file::{File, FileThatHasBeenRead},
     },
 };
 
-pub struct ReconResultsRepository {
+pub struct DaprSvcReconTasksHandler {
     //the dapr server ip
     pub dapr_grpc_server_address: String,
 
     //the dapr component name
-    pub dapr_component_name: String,
-
-    //the dapr state store name
-    pub dapr_state_store_name: String,
+    pub recon_tasks_service_name: String,
 }
 
 #[async_trait]
-impl ReconResultsRepositoryInterface for ReconResultsRepository {
-    async fn get_reconstructed_file(
-        &self,
-        _file_id: &String,
-    ) -> Result<Option<ReconstructedFile>, AppError> {
-        let _ = self.get_dapr_connection();
-        Ok(Option::None)
+impl ReconTasksHandlerInterface for DaprSvcReconTasksHandler {
+    async fn create_recon_task(&self, _file: &File) -> Result<String, AppError> {
+        //create a dapr client
+        let _ = self.get_dapr_connection().await?;
+        Ok(String::from(""))
     }
 
-    async fn save_reconstructed_file(
+    async fn attach_primary_file_to_task(
         &self,
-        _reconstructed_file: &ReconstructedFile,
-    ) -> Result<bool, AppError> {
-        let _ = self.get_dapr_connection();
-        Ok(true)
+        _file: &FileThatHasBeenRead,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn attach_comparison_file_to_task(
+        &self,
+        _file: &FileThatHasBeenRead,
+    ) -> Result<(), AppError> {
+        Ok(())
     }
 }
 
-impl ReconResultsRepository {
+impl DaprSvcReconTasksHandler {
     async fn get_dapr_connection(&self) -> Result<Client<DaprClient<TonicChannel>>, AppError> {
         // Create the client
         let dapr_grpc_server_address = self.dapr_grpc_server_address.clone();

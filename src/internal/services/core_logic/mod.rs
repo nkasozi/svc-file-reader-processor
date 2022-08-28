@@ -1,3 +1,4 @@
+pub mod readers;
 pub mod transformer;
 
 #[cfg(test)]

@@ -1,12 +1,13 @@
 use crate::{
-    external::{
-        pubsub::dapr_pubsub::DaprPubSub,
-        repositories::recon_results_repository::ReconResultsRepository,
+    external::services::{
+        svc_file_chunks_upload_handler::DaprSvcFileChunksUploader,
+        svc_recon_tasks_handler::DaprSvcReconTasksHandler,
     },
     internal::{
-        interfaces::reconstruct_file_service::ReconstructFileServiceInterface,
+        interfaces::split_file_service::SplitFileServiceInterface,
         services::{
-            core_logic::transformer::Transformer, reconstruct_file_service::ReconstructFileService,
+            core_logic::{readers::factory::FileReaderFactory, transformer::Transformer},
+            split_file_service::SplitFileService,
         },
         web_api::handlers,
     },
@@ -15,11 +16,10 @@ use actix_web::{web::Data, App, HttpServer};
 
 // constants
 const DEFAULT_DAPR_CONNECTION_URL: &'static str = "http://localhost:5005";
-const DEFAULT_DAPR_STATE_STORE_COMPONENT_NAME: &'static str = "State";
-const DEFAULT_DAPR_STATE_STORE_NAME: &'static str = "ReconstructedFilesStore";
-const DEFAULT_DAPR_PUBSUB_COMPONENT_NAME: &'static str = "PubSub";
 const DEFAULT_APP_LISTEN_IP: &'static str = "0.0.0.0";
 const DEFAULT_APP_LISTEN_PORT: u16 = 8080;
+const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME: &'static str = "";
+const DEFAULT_RECON_TASKS_SERVICE_NAME: &'static str = "";
 
 #[derive(Clone, Debug)]
 struct AppSettings {
@@ -27,13 +27,11 @@ struct AppSettings {
 
     pub app_ip: String,
 
-    pub dapr_state_store_component_name: String,
-
-    pub dapr_pubsub_component_name: String,
-
     pub dapr_grpc_server_address: String,
 
-    pub dapr_state_store_name: String,
+    pub file_chunks_uploader_service_name: String,
+
+    pub recon_tasks_service_name: String,
 }
 
 pub async fn run_async() -> Result<(), std::io::Error> {
@@ -52,26 +50,26 @@ pub async fn run_async() -> Result<(), std::io::Error> {
         // add shared state and routing
         App::new()
             .app_data(Data::new(service))
-            .service(handlers::reconstruct_file)
+            .service(handlers::read_file)
     })
     .bind(app_listen_url)?
     .run()
     .await
 }
 
-fn setup_service(app_settings: AppSettings) -> Box<dyn ReconstructFileServiceInterface> {
-    let service: Box<dyn ReconstructFileServiceInterface> = Box::new(ReconstructFileService {
-        recon_results_repository: Box::new(ReconResultsRepository {
-            dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
-            dapr_component_name: app_settings.dapr_state_store_component_name.clone(),
-            dapr_state_store_name: app_settings.dapr_state_store_name.clone(),
-        }),
-
+fn setup_service(app_settings: AppSettings) -> Box<dyn SplitFileServiceInterface> {
+    let service: Box<dyn SplitFileServiceInterface> = Box::new(SplitFileService {
         transformer: Box::new(Transformer {}),
-
-        pubsub: Box::new(DaprPubSub {
+        file_reader: Box::new(FileReaderFactory {}),
+        file_chunks_uploader: Box::new(DaprSvcFileChunksUploader {
             dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
-            dapr_component_name: app_settings.dapr_pubsub_component_name.clone(),
+            file_chunks_uploader_service_name: app_settings
+                .file_chunks_uploader_service_name
+                .clone(),
+        }),
+        recon_tasks_handler: Box::new(DaprSvcReconTasksHandler {
+            dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
+            recon_tasks_service_name: app_settings.recon_tasks_service_name.clone(),
         }),
     });
     service
@@ -83,16 +81,13 @@ fn read_app_settings() -> AppSettings {
 
         app_ip: std::env::var("APP_IP").unwrap_or(DEFAULT_APP_LISTEN_IP.to_string()),
 
-        dapr_state_store_component_name: std::env::var("DAPR_STATE_STORE_COMPONENT_NAME")
-            .unwrap_or(DEFAULT_DAPR_STATE_STORE_COMPONENT_NAME.to_string()),
-
         dapr_grpc_server_address: std::env::var("DAPR_IP")
             .unwrap_or(DEFAULT_DAPR_CONNECTION_URL.to_string()),
 
-        dapr_state_store_name: std::env::var("DAPR_STATE_STORE_NAME")
-            .unwrap_or(DEFAULT_DAPR_STATE_STORE_NAME.to_string()),
+        file_chunks_uploader_service_name: std::env::var("FILE_CHUNKS_UPLOAD_SERVICE_NAME")
+            .unwrap_or(DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME.to_string()),
 
-        dapr_pubsub_component_name: std::env::var("DAPR_PUBUB_COMPONENT_NAME")
-            .unwrap_or(DEFAULT_DAPR_PUBSUB_COMPONENT_NAME.to_string()),
+        recon_tasks_service_name: std::env::var("RECON_TASKS_SERVICE_NAME")
+            .unwrap_or(DEFAULT_RECON_TASKS_SERVICE_NAME.to_string()),
     }
 }
