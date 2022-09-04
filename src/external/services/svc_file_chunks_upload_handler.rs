@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use dapr::{dapr::dapr::proto::runtime::v1::dapr_client::DaprClient, Client};
-use tonic::transport::Channel as TonicChannel;
+use reqwest::StatusCode;
 
 use crate::internal::{
     interfaces::svc_file_chunks_uploader::FileChunksUploaderInterface,
@@ -8,7 +7,9 @@ use crate::internal::{
     shared_reconciler_rust_libraries::models::entities::app_errors::{AppError, AppErrorKind},
 };
 
-pub struct DaprSvcFileChunksUploader {
+use super::constants::{APP_ID_HEADER_NAME, CONTENT_TYPE_HEADER_NAME, CONTENT_TYPE_HEADER_VALUE};
+
+pub struct DaprSvcFileChunksUploadHandler {
     //the dapr server ip
     pub dapr_grpc_server_address: String,
 
@@ -17,50 +18,48 @@ pub struct DaprSvcFileChunksUploader {
 }
 
 #[async_trait]
-impl FileChunksUploaderInterface for DaprSvcFileChunksUploader {
+impl FileChunksUploaderInterface for DaprSvcFileChunksUploadHandler {
     async fn upload_file_chunk(
         &self,
-        _file_upload_chunk: &UploadFileChunkRequest,
+        file_upload_chunk: &UploadFileChunkRequest,
     ) -> Result<(), AppError> {
-        //create a dapr client
-        let _ = self.get_dapr_connection().await?;
+        //format body and url
+        //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
+        let app_id = self.file_chunks_uploader_service_name.clone();
+        let host = self.dapr_grpc_server_address.clone();
+        let url = format!("{host}/v1.0/invoke/{app_id}/method/upload-file-chunk");
+        let payload = serde_json::to_string(&file_upload_chunk).unwrap_or("".to_string());
 
-        //call the binding
-        // let url = format!("/upload-file-chunk",);
-        // let binding_response = client
-        //     .invoke_method(
-        //         self.file_chunks_uploader_service_name.clone(),
-        //         url,
-        //         file_upload_chunk.clone(),
-        //     )
-        //     .await;
+        //create client
+        let client = self.get_http_client().await?;
+
+        //send request
+        let http_response = client
+            .post(url)
+            .body(payload)
+            .header(CONTENT_TYPE_HEADER_NAME, CONTENT_TYPE_HEADER_VALUE)
+            .header(APP_ID_HEADER_NAME, app_id)
+            .send()
+            .await;
 
         // //handle the bindings response
-        // match binding_response {
-        //     //successs
-        //     Ok(_) => return Ok(()),
-        //     //failure
-        //     Err(e) => return Err(AppError::new(AppErrorKind::NotFound, e.to_string())),
-        // }
-        Ok(())
+        match http_response {
+            //successs
+            Ok(resp) => match resp.status() {
+                StatusCode::OK => Ok(()),
+                _ => Err(AppError::new(
+                    AppErrorKind::ExternalServerError,
+                    resp.text().await.unwrap_or("".to_string()),
+                )),
+            },
+            //failure
+            Err(e) => return Err(AppError::new(AppErrorKind::ConnectionError, e.to_string())),
+        }
     }
 }
 
-impl DaprSvcFileChunksUploader {
-    async fn get_dapr_connection(&self) -> Result<Client<DaprClient<TonicChannel>>, AppError> {
-        // Create the client
-        let dapr_grpc_server_address = self.dapr_grpc_server_address.clone();
-
-        //connect to dapr
-        let client_connect_result =
-            dapr::Client::<dapr::client::TonicClient>::connect(dapr_grpc_server_address).await;
-
-        //handle the connection result
-        match client_connect_result {
-            //connection succeeded
-            Ok(s) => return Ok(s),
-            //connection failed
-            Err(e) => return Err(AppError::new(AppErrorKind::ConnectionError, e.to_string())),
-        }
+impl DaprSvcFileChunksUploadHandler {
+    async fn get_http_client(&self) -> Result<reqwest::Client, AppError> {
+        return Ok(reqwest::Client::new());
     }
 }

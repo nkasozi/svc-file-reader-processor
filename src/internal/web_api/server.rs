@@ -1,6 +1,6 @@
 use crate::{
     external::services::{
-        svc_file_chunks_upload_handler::DaprSvcFileChunksUploader,
+        svc_file_chunks_upload_handler::DaprSvcFileChunksUploadHandler,
         svc_recon_tasks_handler::DaprSvcReconTasksHandler,
     },
     internal::{
@@ -61,7 +61,7 @@ fn setup_service(app_settings: AppSettings) -> Box<dyn SplitFileServiceInterface
     let service: Box<dyn SplitFileServiceInterface> = Box::new(SplitFileService {
         transformer: Box::new(Transformer {}),
         file_reader: Box::new(FileReaderFactory {}),
-        file_chunks_uploader: Box::new(DaprSvcFileChunksUploader {
+        file_chunks_uploader: Box::new(DaprSvcFileChunksUploadHandler {
             dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
             file_chunks_uploader_service_name: app_settings
                 .file_chunks_uploader_service_name
