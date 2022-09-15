@@ -34,7 +34,7 @@ impl SplitFileServiceInterface for SplitFileService {
 
     This function will return an error if the request fails validation or fails to be uploaded.
     */
-    async fn split_file_into_chunks(
+    async fn read_and_split_file_into_chunks(
         &self,
         request: SplitFileRequest,
     ) -> Result<SplitFileResponse, AppError> {
@@ -49,7 +49,7 @@ impl SplitFileServiceInterface for SplitFileService {
             }
         }
 
-        //get a handle to the underlying file chunk
+        //get a handle to the underlying file
         let mut file = request.file;
 
         //read the records in the file

@@ -29,7 +29,7 @@ impl ReconTasksHandlerInterface for DaprSvcReconTasksHandler {
         //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
         let app_id = self.recon_tasks_service_name.clone();
         let host = self.dapr_grpc_server_address.clone();
-        let url = format!("{host}/v1.0/invoke/{app_id}/method/recon-tasks");
+        let url = format!("{host}/recon-tasks");
         let payload = serde_json::to_string(&_file).unwrap_or("".to_string());
 
         //create client
@@ -79,7 +79,7 @@ impl ReconTasksHandlerInterface for DaprSvcReconTasksHandler {
         //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
         let app_id = self.recon_tasks_service_name.clone();
         let host = self.dapr_grpc_server_address.clone();
-        let url = format!("{host}/v1.0/invoke/{app_id}/method/recon-tasks/attach-primary-file");
+        let url = format!("{host}/recon-tasks/attach-primary-file");
         let payload = serde_json::to_string(&file).unwrap_or("".to_string());
 
         //create client
@@ -117,7 +117,7 @@ impl ReconTasksHandlerInterface for DaprSvcReconTasksHandler {
         //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
         let app_id = self.recon_tasks_service_name.clone();
         let host = self.dapr_grpc_server_address.clone();
-        let url = format!("{host}/v1.0/invoke/{app_id}/method/recon-tasks/attach-comparison-file");
+        let url = format!("{host}/recon-tasks/attach-comparison-file");
         let payload = serde_json::to_string(&file).unwrap_or("".to_string());
 
         //create client

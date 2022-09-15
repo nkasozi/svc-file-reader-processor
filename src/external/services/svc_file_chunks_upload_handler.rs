@@ -27,7 +27,7 @@ impl FileChunksUploaderInterface for DaprSvcFileChunksUploadHandler {
         //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
         let app_id = self.file_chunks_uploader_service_name.clone();
         let host = self.dapr_grpc_server_address.clone();
-        let url = format!("{host}/v1.0/invoke/{app_id}/method/upload-file-chunk");
+        let url = format!("{host}/upload-file-chunk");
         let payload = serde_json::to_string(&file_upload_chunk).unwrap_or("".to_string());
 
         //create client

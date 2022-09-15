@@ -17,9 +17,9 @@ use actix_web::{web::Data, App, HttpServer};
 // constants
 const DEFAULT_DAPR_CONNECTION_URL: &'static str = "http://localhost:5005";
 const DEFAULT_APP_LISTEN_IP: &'static str = "0.0.0.0";
-const DEFAULT_APP_LISTEN_PORT: u16 = 8080;
-const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME: &'static str = "";
-const DEFAULT_RECON_TASKS_SERVICE_NAME: &'static str = "";
+const DEFAULT_APP_LISTEN_PORT: u16 = 8082;
+const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME: &'static str = "svc-file-chunks-upload-manager";
+const DEFAULT_RECON_TASKS_SERVICE_NAME: &'static str = "svc-task-details-repository-manager";
 
 #[derive(Clone, Debug)]
 struct AppSettings {
@@ -77,7 +77,7 @@ fn setup_service(app_settings: AppSettings) -> Box<dyn SplitFileServiceInterface
 
 fn read_app_settings() -> AppSettings {
     AppSettings {
-        app_port: std::env::var("APP_PORT").unwrap_or(DEFAULT_APP_LISTEN_PORT.to_string()),
+        app_port: DEFAULT_APP_LISTEN_PORT.to_string(),
 
         app_ip: std::env::var("APP_IP").unwrap_or(DEFAULT_APP_LISTEN_IP.to_string()),
 

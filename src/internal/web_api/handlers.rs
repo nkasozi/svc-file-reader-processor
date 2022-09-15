@@ -15,7 +15,9 @@ async fn read_file(
     task_details: web::Json<SplitFileRequest>,
     service: Data<Box<dyn SplitFileServiceInterface>>,
 ) -> HttpResponse {
-    let recon_task_details = service.split_file_into_chunks(task_details.0).await;
+    let recon_task_details = service
+        .read_and_split_file_into_chunks(task_details.0)
+        .await;
 
     return match recon_task_details {
         Ok(details) => HttpResponse::Ok().json(details),

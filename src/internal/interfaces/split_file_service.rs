@@ -11,7 +11,7 @@ use mockall::automock;
 #[automock]
 #[async_trait]
 pub trait SplitFileServiceInterface: Send + Sync {
-    async fn split_file_into_chunks(
+    async fn read_and_split_file_into_chunks(
         &self,
         file: SplitFileRequest,
     ) -> Result<SplitFileResponse, AppError>;
