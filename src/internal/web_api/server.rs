@@ -1,3 +1,5 @@
+use actix_web::{App, HttpServer, web::Data};
+
 use crate::{
     external::services::{
         svc_file_chunks_upload_handler::DaprSvcFileChunksUploadHandler,
@@ -6,16 +8,16 @@ use crate::{
     internal::{
         interfaces::split_file_service::SplitFileServiceInterface,
         services::{
-            core_logic::{readers::factory::FileReaderFactory, transformer::Transformer},
+            core_logic::transformer::Transformer,
             split_file_service::SplitFileService,
         },
         web_api::handlers,
     },
 };
-use actix_web::{web::Data, App, HttpServer};
+use crate::external::readers::factory::FileReaderFactory;
 
 // constants
-const DEFAULT_DAPR_CONNECTION_URL: &'static str = "http://localhost:5005";
+const DEFAULT_DAPR_CONNECTION_URL: &'static str = "http://localhost:3500";
 const DEFAULT_APP_LISTEN_IP: &'static str = "0.0.0.0";
 const DEFAULT_APP_LISTEN_PORT: u16 = 8082;
 const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME: &'static str = "svc-file-chunks-upload-manager";
@@ -52,9 +54,9 @@ pub async fn run_async() -> Result<(), std::io::Error> {
             .app_data(Data::new(service))
             .service(handlers::read_file)
     })
-    .bind(app_listen_url)?
-    .run()
-    .await
+        .bind(app_listen_url)?
+        .run()
+        .await
 }
 
 fn setup_service(app_settings: AppSettings) -> Box<dyn SplitFileServiceInterface> {
@@ -63,13 +65,13 @@ fn setup_service(app_settings: AppSettings) -> Box<dyn SplitFileServiceInterface
         file_reader: Box::new(FileReaderFactory {}),
         file_chunks_uploader: Box::new(DaprSvcFileChunksUploadHandler {
             dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
-            file_chunks_uploader_service_name: app_settings
+            file_chunks_service_app_id: app_settings
                 .file_chunks_uploader_service_name
                 .clone(),
         }),
         recon_tasks_handler: Box::new(DaprSvcReconTasksHandler {
             dapr_grpc_server_address: app_settings.dapr_grpc_server_address.clone(),
-            recon_tasks_service_name: app_settings.recon_tasks_service_name.clone(),
+            recon_tasks_service_app_id: app_settings.recon_tasks_service_name.clone(),
         }),
     });
     service

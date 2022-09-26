@@ -14,6 +14,7 @@ impl PdfFileReader {
             file_type: file.file_type.clone(),
             column_headers: PdfFileReader::read_column_headers(file),
             file_rows: PdfFileReader::read_file_rows(file),
+            file_metadata: file.file_metadata.clone(),
         };
         return Ok(file_that_has_been_read);
     }

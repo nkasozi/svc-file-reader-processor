@@ -14,7 +14,7 @@ pub struct DaprSvcFileChunksUploadHandler {
     pub dapr_grpc_server_address: String,
 
     //the dapr component name
-    pub file_chunks_uploader_service_name: String,
+    pub file_chunks_service_app_id: String,
 }
 
 #[async_trait]
@@ -24,8 +24,7 @@ impl FileChunksUploaderInterface for DaprSvcFileChunksUploadHandler {
         file_upload_chunk: &UploadFileChunkRequest,
     ) -> Result<(), AppError> {
         //format body and url
-        //http://localhost:3602/v1.0/invoke/checkout/method/checkout/100
-        let app_id = self.file_chunks_uploader_service_name.clone();
+        let app_id = self.file_chunks_service_app_id.clone();
         let host = self.dapr_grpc_server_address.clone();
         let url = format!("{host}/upload-file-chunk");
         let payload = serde_json::to_string(&file_upload_chunk).unwrap_or("".to_string());
@@ -44,7 +43,7 @@ impl FileChunksUploaderInterface for DaprSvcFileChunksUploadHandler {
 
         // //handle the bindings response
         match http_response {
-            //successs
+            //success
             Ok(resp) => match resp.status() {
                 StatusCode::OK => Ok(()),
                 _ => Err(AppError::new(

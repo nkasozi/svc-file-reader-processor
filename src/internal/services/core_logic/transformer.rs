@@ -20,7 +20,7 @@ impl TransformerInterface for Transformer {
         let mut chunk_sequence_number = 1;
 
         let mut file_upload_request = UploadFileChunkRequest {
-            upload_request_id: file_that_has_been_read.upload_request_id.clone(),
+            upload_request_id: file_that_has_been_read.upload_request_id.clone().unwrap_or("".to_string()),
             chunk_sequence_number: chunk_sequence_number.clone(),
             chunk_source: self.get_chunk_source(file_that_has_been_read.file_type.clone()),
             chunk_rows: vec![],
@@ -40,7 +40,7 @@ impl TransformerInterface for Transformer {
 
                 //create a new upload request for a new group of rows
                 file_upload_request = UploadFileChunkRequest {
-                    upload_request_id: file_that_has_been_read.upload_request_id.clone(),
+                    upload_request_id: file_that_has_been_read.upload_request_id.clone().unwrap_or("".to_string()),
                     chunk_sequence_number: chunk_sequence_number.clone(),
                     chunk_source: self.get_chunk_source(file_that_has_been_read.file_type.clone()),
                     chunk_rows: vec![],

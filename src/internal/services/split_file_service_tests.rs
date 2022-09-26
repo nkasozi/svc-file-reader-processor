@@ -1,253 +1,241 @@
-// use super::reconstruct_file_service::FileChunkUploadService;
+use crate::internal::interfaces::file_reader::MockFileReader;
+use crate::internal::interfaces::split_file_service::SplitFileServiceInterface;
+use crate::internal::interfaces::svc_file_chunks_uploader::MockFileChunksUploaderInterface;
+use crate::internal::interfaces::svc_recon_tasks_handler::MockReconTasksHandlerInterface;
+use crate::internal::interfaces::transformer::MockTransformerInterface;
+use crate::internal::models::view_models::requests::split_file_request::SplitFileRequest;
+use crate::internal::models::view_models::requests::upload_file_chunk_request::UploadFileChunkRequest;
+use crate::internal::models::view_models::responses::split_file_response::SplitFileResponse;
+use crate::internal::services::split_file_service::SplitFileService;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::app_errors::AppError;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::app_errors::AppErrorKind;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::file::{File, FileMetadata, FileStorageLocation, FileThatHasBeenRead, SupportedFileExtension};
+use crate::internal::shared_reconciler_rust_libraries::models::entities::file_upload_chunk::FileUploadChunkSource;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::recon_tasks_models::{ComparisonPair, ReconFileType};
 
-// #[actix_rt::test]
-// async fn given_valid_request_calls_correct_dependencies_and_returns_success() {
-//     let (mut mock_file_upload_repo, mut mock_recon_tasks_repo, mut mock_to_entity_transformer) =
-//         setup_dependencies();
+//specifies the request, expected mock responses from dependencies and
+//the expected final method response for
+//a particular test case
+#[derive(Clone, Debug)]
+struct TestSpecifications {
+    request: SplitFileRequest,
+    mock_read_file_result: Option<Result<FileThatHasBeenRead, AppError>>,
+    mock_create_recon_task_result: Option<Result<String, AppError>>,
+    mock_attach_comparison_file_result: Option<Result<String, AppError>>,
+    mock_group_rows_into_file_chunks_result: Option<Vec<UploadFileChunkRequest>>,
+    mock_upload_file_chunk_result: Option<Result<(), AppError>>,
+    expected_final_result: Result<SplitFileResponse, AppError>,
+}
 
-//     mock_recon_tasks_repo
-//         .expect_get_recon_task_details()
-//         .returning(|_y| Ok(dummy_success_recon_task_details()));
+//holds a number of test
+//cases testing different scenarios
+#[derive(Clone, Debug)]
+struct ValidRequestsTestScenarios {
+    ok_test: TestSpecifications,
+    is_read_file_error_handled: TestSpecifications,
+    is_create_recon_task_error_handled: TestSpecifications,
+    is_attach_file_to_task_error_handled: TestSpecifications,
+    is_upload_file_chunk_error_handled: TestSpecifications,
+}
 
-//     mock_file_upload_repo
-//         .expect_save_file_upload_chunk_to_comparison_file_queue()
-//         .returning(|_y| Ok(String::from("FILE_CHUNK_1234")));
+#[test]
+fn test_read_and_split_file_handler_valid_request() {
+    let ok_test_specification = generate_ok_test_specification();
+    let valid_requests_test_suite = ValidRequestsTestScenarios {
+        ok_test: TestSpecifications {
+            ..ok_test_specification.clone()
+        },
+        is_read_file_error_handled: TestSpecifications {
+            mock_read_file_result: Some(dummy_error(AppErrorKind::InternalError)),
+            mock_create_recon_task_result: None,
+            mock_attach_comparison_file_result: None,
+            mock_group_rows_into_file_chunks_result: None,
+            mock_upload_file_chunk_result: None,
+            expected_final_result: dummy_error(AppErrorKind::InternalError),
+            ..ok_test_specification.clone()
+        },
+        is_create_recon_task_error_handled: TestSpecifications {
+            mock_create_recon_task_result: Some(dummy_error(AppErrorKind::InternalError)),
+            mock_attach_comparison_file_result: None,
+            mock_group_rows_into_file_chunks_result: None,
+            mock_upload_file_chunk_result: None,
+            expected_final_result: dummy_error(AppErrorKind::InternalError),
+            ..ok_test_specification.clone()
+        },
+        is_attach_file_to_task_error_handled: TestSpecifications {
+            mock_attach_comparison_file_result: Some(dummy_error(AppErrorKind::InternalError)),
+            mock_group_rows_into_file_chunks_result: None,
+            mock_upload_file_chunk_result: None,
+            expected_final_result: dummy_error(AppErrorKind::InternalError),
+            ..ok_test_specification.clone()
+        },
+        is_upload_file_chunk_error_handled: TestSpecifications {
+            mock_upload_file_chunk_result: Some(dummy_error(AppErrorKind::InternalError)),
+            expected_final_result: dummy_error(AppErrorKind::InternalError),
+            ..ok_test_specification.clone()
+        },
+    };
 
-//     mock_to_entity_transformer
-//         .expect_transform_into_file_upload_chunk()
-//         .returning(|_, _| dummy_valid_file_chunk());
+    rspec::run(&rspec::given("valid client request", valid_requests_test_suite, |ctx| {
+        ctx.when("all dependencies return OK", |ctx| {
+            ctx.then("returns OK", |env| {
+                let resp = setup_service_and_send_request(&env.ok_test.clone());
+                assert_eq!(resp, env.ok_test.expected_final_result.clone())
+            });
+        });
 
-//     let sut = setup_service_under_test(
-//         mock_file_upload_repo,
-//         mock_recon_tasks_repo,
-//         mock_to_entity_transformer,
-//     );
+        ctx.when("read file returns an error", |ctx| {
+            ctx.then("method returns the same error", |env| {
+                let resp = setup_service_and_send_request(&env.is_read_file_error_handled.clone());
+                assert_eq!(resp, env.is_read_file_error_handled.expected_final_result.clone())
+            });
+        });
 
-//     let test_request = dummy_valid_test_request();
+        ctx.when("create recon task returns an error", |ctx| {
+            ctx.then("method returns the same error", |env| {
+                let resp = setup_service_and_send_request(&env.is_create_recon_task_error_handled.clone());
+                assert_eq!(resp, env.is_create_recon_task_error_handled.expected_final_result.clone())
+            });
+        });
 
-//     let actual = sut.upload_file_chunk(test_request).await;
+        ctx.when("attach comparison file to task returns an error", |ctx| {
+            ctx.then("method returns the same error", |env| {
+                let resp = setup_service_and_send_request(&env.is_attach_file_to_task_error_handled.clone());
+                assert_eq!(resp, env.is_attach_file_to_task_error_handled.expected_final_result.clone())
+            });
+        });
 
-//     assert!(actual.is_ok());
-// }
 
-// #[actix_rt::test]
-// async fn given_invalid_request_returns_error() {
-//     let (mut mock_file_upload_repo, mut mock_recon_tasks_repo, mut mock_to_entity_transformer) =
-//         setup_dependencies();
+        ctx.when("upload file chunks returns an error", |ctx| {
+            ctx.then("method returns the same error", |env| {
+                let resp = setup_service_and_send_request(&env.is_upload_file_chunk_error_handled.clone());
+                assert_eq!(resp, env.is_upload_file_chunk_error_handled.expected_final_result.clone())
+            });
+        });
+    }));
+}
 
-//     mock_recon_tasks_repo
-//         .expect_get_recon_task_details()
-//         .returning(|_y| Ok(dummy_success_recon_task_details()));
+fn generate_ok_test_specification() -> TestSpecifications {
+    TestSpecifications {
+        request: get_dummy_request(),
+        mock_read_file_result: Some(dummy_file_that_has_been_read()),
+        mock_create_recon_task_result: Some(Ok(String::from("RECON-TASK-1234"))),
+        mock_attach_comparison_file_result: Some(Ok(String::from("RECON-TASK-1234"))),
+        mock_group_rows_into_file_chunks_result: Some(vec![UploadFileChunkRequest {
+            upload_request_id: "1234".to_string(),
+            chunk_sequence_number: 1,
+            chunk_source: FileUploadChunkSource::ComparisonFileChunk,
+            chunk_rows: vec![],
+            is_last_chunk: false,
+        }]),
+        mock_upload_file_chunk_result: Some(Ok(())),
+        expected_final_result: Ok(SplitFileResponse {
+            upload_request_id: String::from("RECON-TASK-1234"),
+        }),
+    }
+}
 
-//     mock_file_upload_repo
-//         .expect_save_file_upload_chunk_to_comparison_file_queue()
-//         .returning(|_y| Ok(String::from("FILE_CHUNK_1234")));
 
-//     mock_to_entity_transformer
-//         .expect_transform_into_file_upload_chunk()
-//         .returning(|_, _| dummy_valid_file_chunk());
+fn dummy_error<V>(app_error_kind: AppErrorKind) -> Result<V, AppError> {
+    Err(AppError::new(
+        app_error_kind, "error occurred".to_string(),
+    ))
+}
 
-//     let sut = setup_service_under_test(
-//         mock_file_upload_repo,
-//         mock_recon_tasks_repo,
-//         mock_to_entity_transformer,
-//     );
+fn dummy_file_that_has_been_read() -> Result<FileThatHasBeenRead, AppError> {
+    Ok(
+        FileThatHasBeenRead {
+            id: None,
+            upload_request_id: None,
+            file_type: ReconFileType::PrimaryFile,
+            column_headers: vec![],
+            file_rows: vec![],
+            file_metadata: None,
+        })
+}
 
-//     let mut test_request = dummy_valid_test_request();
-//     test_request.chunk_sequence_number = 0;
 
-//     let actual = sut.upload_file_chunk(test_request).await;
+fn setup_service_and_send_request(test_specifications: &TestSpecifications) -> Result<SplitFileResponse, AppError> {
+    let mut mock_file_reader = Box::new(MockFileReader::new());
+    let mut mock_transformer = Box::new(MockTransformerInterface::new());
+    let mut mock_file_chunks_uploader = Box::new(MockFileChunksUploaderInterface::new());
+    let mut mock_recon_tasks_repo_handler = Box::new(MockReconTasksHandlerInterface::new());
 
-//     assert!(actual.is_err());
-// }
+    //setup mock responses
+    match test_specifications.clone().mock_read_file_result {
+        None => {}
+        Some(result) => {
+            mock_file_reader.expect_read_file().returning(move |_y| {
+                result.clone()
+            });
+        }
+    }
 
-// #[actix_rt::test]
-// async fn given_valid_request_but_repo_returns_error_returns_error() {
-//     let (mut mock_file_upload_repo, mut mock_recon_tasks_repo, mut mock_to_entity_transformer) =
-//         setup_dependencies();
+    match test_specifications.clone().mock_create_recon_task_result {
+        None => {}
+        Some(result) => {
+            mock_recon_tasks_repo_handler.expect_create_recon_task().returning(move |_y| {
+                result.clone()
+            });
+        }
+    }
 
-//     mock_recon_tasks_repo
-//         .expect_get_recon_task_details()
-//         .returning(|_y| Ok(dummy_success_recon_task_details()));
+    match test_specifications.clone().mock_attach_comparison_file_result {
+        None => {}
+        Some(result) => {
+            mock_recon_tasks_repo_handler.expect_attach_comparison_file_to_task().returning(move |_y| {
+                result.clone()
+            });
+        }
+    }
 
-//     mock_file_upload_repo
-//         .expect_save_file_upload_chunk_to_comparison_file_queue()
-//         .returning(|_y| {
-//             Err(AppError::new(
-//                 AppErrorKind::ConnectionError,
-//                 "unable to connect".to_string(),
-//             ))
-//         });
+    match test_specifications.clone().mock_group_rows_into_file_chunks_result {
+        None => {}
+        Some(result) => {
+            mock_transformer.expect_group_rows_into_file_chunks().returning(move |_y, _x| {
+                result.clone()
+            });
+        }
+    }
 
-//     mock_to_entity_transformer
-//         .expect_transform_into_file_upload_chunk()
-//         .returning(|_, _| dummy_valid_file_chunk());
+    match test_specifications.clone().mock_upload_file_chunk_result {
+        None => {}
+        Some(result) => {
+            mock_file_chunks_uploader.expect_upload_file_chunk().returning(move |_y| {
+                result.clone()
+            });
+        }
+    }
 
-//     let sut = setup_service_under_test(
-//         mock_file_upload_repo,
-//         mock_recon_tasks_repo,
-//         mock_to_entity_transformer,
-//     );
+    let sut = SplitFileService {
+        file_reader: mock_file_reader,
+        transformer: mock_transformer,
+        file_chunks_uploader: mock_file_chunks_uploader,
+        recon_tasks_handler: mock_recon_tasks_repo_handler,
+    };
 
-//     let test_request = dummy_valid_test_request();
+    let result = tokio_test::block_on(sut.read_and_split_file_into_chunks(test_specifications.clone().request));
 
-//     let actual = sut.upload_file_chunk(test_request).await;
+    return result;
+}
 
-//     assert!(actual.is_err());
-// }
-
-// use crate::internal::{
-//     interfaces::{
-//         pubsub_repo::{MockPubSubRepositoryInterface, PubSubRepositoryInterface},
-//         recon_results_repo::{
-//             MockReconTasksDetailsRetrieverInterface, ReconTasksDetailsRetrieverInterface,
-//         },
-//         reconstruct_file_service::FileChunkUploadServiceInterface,
-//         transformer::{MockTransformerInterface, TransformerInterface},
-//     },
-//     models::view_models::requests::reconstruct_file_from_chunks_request::{
-//         FileRow, UploadFileChunkRequest,
-//     },
-//     shared_reconciler_rust_libraries::models::{
-//         entities::{
-//             app_errors::{AppError, AppErrorKind},
-//             file_chunk_queue::FileChunkQueue,
-//             file_upload_chunk::{FileUploadChunk, FileUploadChunkSource},
-//             recon_tasks_models::{
-//                 ComparisonPair, ReconFileMetaData, ReconFileType, ReconTaskDetails,
-//                 ReconciliationConfigs,
-//             },
-//         },
-//         view_models::recon_task_response_details::ReconTaskResponseDetails,
-//     },
-// };
-
-// fn setup_dependencies() -> (
-//     Box<MockPubSubRepositoryInterface>,
-//     Box<MockReconTasksDetailsRetrieverInterface>,
-//     Box<MockTransformerInterface>,
-// ) {
-//     let mock_file_upload_repo = Box::new(MockPubSubRepositoryInterface::new());
-//     let mock_recon_tasks_repo = Box::new(MockReconTasksDetailsRetrieverInterface::new());
-//     let mock_to_entity_transformer = Box::new(MockTransformerInterface::new());
-//     return (
-//         mock_file_upload_repo,
-//         mock_recon_tasks_repo,
-//         mock_to_entity_transformer,
-//     );
-// }
-
-// fn dummy_success_recon_task_details() -> ReconTaskResponseDetails {
-//     ReconTaskResponseDetails {
-//         task_id: String::from("task-1234"),
-//         task_details: ReconTaskDetails {
-//             id: String::from("task-1234"),
-//             primary_file_id: String::from("src-file-1234"),
-//             comparison_file_id: String::from("cmp-file-1234"),
-//             is_done: false,
-//             has_begun: true,
-//             comparison_pairs: vec![new_same_column_index_comparison_pair(0)],
-//             recon_config: default_recon_configs(),
-//             recon_results_queue_info: FileChunkQueue {
-//                 topic_id: String::from("recon-results-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//         primary_file_metadata: ReconFileMetaData {
-//             id: String::from("src-file-1234"),
-//             file_name: String::from("src-file-1234"),
-//             row_count: 1000,
-//             column_delimiters: vec![],
-//             recon_file_type: ReconFileType::PrimaryFile,
-//             column_headers: vec![String::from("header1"), String::from("header2")],
-//             file_hash: String::from("src-file-1234"),
-//             queue_info: FileChunkQueue {
-//                 topic_id: String::from("src-file-chunks-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//         comparison_file_metadata: ReconFileMetaData {
-//             id: String::from("cmp-file-1234"),
-//             file_name: String::from("cmp-file-1234"),
-//             row_count: 1000,
-//             column_delimiters: vec![String::from(",")],
-//             recon_file_type: ReconFileType::ComparisonFile,
-//             column_headers: vec![String::from("header1"), String::from("header2")],
-//             file_hash: String::from("cmp-file-1234"),
-//             queue_info: FileChunkQueue {
-//                 topic_id: String::from("cmp-file-chunks-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//     }
-// }
-
-// fn dummy_valid_test_request() -> UploadFileChunkRequest {
-//     UploadFileChunkRequest {
-//         upload_request_id: String::from("1234"),
-//         chunk_sequence_number: 2,
-//         chunk_source: FileUploadChunkSource::ComparisonFileChunk,
-//         chunk_rows: vec![FileRow {
-//             raw_data: String::from("testing, 1234"),
-//             row_number: 1,
-//         }],
-//         is_last_chunk: false,
-//     }
-// }
-
-// fn dummy_valid_file_chunk() -> FileUploadChunk {
-//     FileUploadChunk {
-//         id: String::from("src-file-1234"),
-//         upload_request_id: String::from("file-1234"),
-//         chunk_sequence_number: 1,
-//         chunk_source: FileUploadChunkSource::ComparisonFileChunk,
-//         chunk_rows: vec![],
-//         date_created: chrono::Utc::now().timestamp(),
-//         date_modified: chrono::Utc::now().timestamp(),
-//         comparison_pairs: vec![new_same_column_index_comparison_pair(0)],
-//         column_headers: vec![],
-//         recon_config: default_recon_configs(),
-//         primary_file_chunks_queue: FileChunkQueue {
-//             topic_id: String::from("src-file-chunks-queue-1"),
-//             last_acknowledged_id: Option::None,
-//         },
-//         comparison_file_chunks_queue: FileChunkQueue {
-//             topic_id: String::from("cmp-file-chunks-queue-1"),
-//             last_acknowledged_id: Option::None,
-//         },
-//         result_chunks_queue: FileChunkQueue {
-//             topic_id: String::from("results-file-chunks-queue-1"),
-//             last_acknowledged_id: Option::None,
-//         },
-//         is_last_chunk: false,
-//     }
-// }
-
-// fn setup_service_under_test(
-//     pubsub: Box<dyn PubSubRepositoryInterface>,
-//     recon_tasks_repo: Box<dyn ReconTasksDetailsRetrieverInterface>,
-//     to_entity_transformer: Box<dyn TransformerInterface>,
-// ) -> FileChunkUploadService {
-//     FileChunkUploadService {
-//         file_upload_repo: pubsub,
-//         recon_tasks_retriever: recon_tasks_repo,
-//         to_entity_transformer: to_entity_transformer,
-//     }
-// }
-
-// fn default_recon_configs() -> ReconciliationConfigs {
-//     ReconciliationConfigs {
-//         should_check_for_duplicate_records_in_comparison_file: true,
-//         should_reconciliation_be_case_sensitive: true,
-//         should_ignore_white_space: true,
-//         should_do_reverse_reconciliation: true,
-//     }
-// }
-
-// fn new_same_column_index_comparison_pair(column_index: usize) -> ComparisonPair {
-//     ComparisonPair {
-//         primary_file_column_index: column_index,
-//         comparison_file_column_index: column_index,
-//         is_row_identifier: true,
-//     }
-// }
+fn get_dummy_request() -> SplitFileRequest {
+    SplitFileRequest {
+        file: File {
+            id: None,
+            upload_request_id: None,
+            file_storage_location: FileStorageLocation::LocalFileSystem,
+            file_extension: SupportedFileExtension::Csv,
+            file_metadata: Some(FileMetadata {
+                column_delimiters: None,
+                comparison_pairs: Some(vec![ComparisonPair {
+                    primary_file_column_index: 0,
+                    comparison_file_column_index: 0,
+                    is_row_identifier: true,
+                }]),
+            }),
+            file_path: Some("E:/Work/test.csv".to_string()),
+            file_type: ReconFileType::ComparisonFile,
+        },
+    }
+}
