@@ -3,9 +3,9 @@ use validator::Validate;
 
 use crate::internal::{
     interfaces::{
-        file_reader::FileReader, split_file_service::SplitFileServiceInterface,
-        svc_file_chunks_uploader::FileChunksUploaderInterface,
-        svc_recon_tasks_handler::ReconTasksHandlerInterface, transformer::TransformerInterface,
+        file_chunks_upload_service_connector::FileChunksUploadHandlerServiceConnectorInterface, file_reader::FileReader,
+        recon_tasks_service_connector::ReconTasksServiceConnectorInterface,
+        split_file_service::SplitFileServiceInterface, transformer::TransformerInterface,
     },
     models::view_models::{
         requests::split_file_request::SplitFileRequest,
@@ -22,8 +22,8 @@ use crate::internal::shared_reconciler_rust_libraries::models::entities::file::F
 pub struct SplitFileService {
     pub file_reader: Box<dyn FileReader>,
     pub transformer: Box<dyn TransformerInterface>,
-    pub file_chunks_uploader: Box<dyn FileChunksUploaderInterface>,
-    pub recon_tasks_handler: Box<dyn ReconTasksHandlerInterface>,
+    pub file_chunks_uploader: Box<dyn FileChunksUploadHandlerServiceConnectorInterface>,
+    pub recon_tasks_handler: Box<dyn ReconTasksServiceConnectorInterface>,
 }
 
 #[async_trait]

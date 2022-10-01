@@ -1,10 +1,9 @@
+use crate::internal::interfaces::file_chunks_upload_service_connector::MockFileChunksUploadHandlerServiceConnectorInterface;
 use crate::internal::interfaces::file_reader::MockFileReader;
+use crate::internal::interfaces::recon_tasks_service_connector::MockReconTasksServiceConnectorInterface;
 use crate::internal::interfaces::split_file_service::SplitFileServiceInterface;
-use crate::internal::interfaces::svc_file_chunks_uploader::MockFileChunksUploaderInterface;
-use crate::internal::interfaces::svc_recon_tasks_handler::MockReconTasksHandlerInterface;
 use crate::internal::interfaces::transformer::MockTransformerInterface;
 use crate::internal::models::view_models::requests::split_file_request::SplitFileRequest;
-use crate::internal::models::view_models::requests::upload_file_chunk_request::UploadFileChunkRequest;
 use crate::internal::models::view_models::responses::split_file_response::SplitFileResponse;
 use crate::internal::services::split_file_service::SplitFileService;
 use crate::internal::shared_reconciler_rust_libraries::models::entities::app_errors::AppError;
@@ -12,6 +11,7 @@ use crate::internal::shared_reconciler_rust_libraries::models::entities::app_err
 use crate::internal::shared_reconciler_rust_libraries::models::entities::file::{File, FileMetadata, FileStorageLocation, FileThatHasBeenRead, SupportedFileExtension};
 use crate::internal::shared_reconciler_rust_libraries::models::entities::file_upload_chunk::FileUploadChunkSource;
 use crate::internal::shared_reconciler_rust_libraries::models::entities::recon_tasks_models::{ComparisonPair, ReconFileType};
+use crate::internal::shared_reconciler_rust_libraries::sdks::internal_microservices::view_models::requests::UploadFileChunkRequest;
 
 //specifies the request, expected mock responses from dependencies and
 //the expected final method response for
@@ -158,8 +158,8 @@ fn dummy_file_that_has_been_read() -> Result<FileThatHasBeenRead, AppError> {
 fn setup_service_and_send_request(test_specifications: &TestSpecifications) -> Result<SplitFileResponse, AppError> {
     let mut mock_file_reader = Box::new(MockFileReader::new());
     let mut mock_transformer = Box::new(MockTransformerInterface::new());
-    let mut mock_file_chunks_uploader = Box::new(MockFileChunksUploaderInterface::new());
-    let mut mock_recon_tasks_repo_handler = Box::new(MockReconTasksHandlerInterface::new());
+    let mut mock_file_chunks_uploader = Box::new(MockFileChunksUploadHandlerServiceConnectorInterface::new());
+    let mut mock_recon_tasks_repo_handler = Box::new(MockReconTasksServiceConnectorInterface::new());
 
     //setup mock responses
     match test_specifications.clone().mock_read_file_result {

@@ -1,99 +1,142 @@
-// use crate::internal::{
-//     interfaces::transformer::TransformerInterface,
-//     models::view_models::requests::reconstruct_file_from_chunks_request::UploadFileChunkRequest,
-//     shared_reconciler_rust_libraries::models::{
-//         entities::{
-//             file_chunk_queue::FileChunkQueue,
-//             file_upload_chunk::FileUploadChunkSource,
-//             recon_tasks_models::{
-//                 ReconFileMetaData, ReconFileType, ReconTaskDetails, ReconciliationConfigs,
-//             },
-//         },
-//         view_models::recon_task_response_details::ReconTaskResponseDetails,
-//     },
-// };
+use crate::internal::interfaces::transformer::TransformerInterface;
+use crate::internal::services::core_logic::transformer::Transformer;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::file::{FileMetadata, FileThatHasBeenRead};
+use crate::internal::shared_reconciler_rust_libraries::models::entities::file_row::FileRow;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::file_upload_chunk::FileUploadChunkSource;
+use crate::internal::shared_reconciler_rust_libraries::models::entities::recon_tasks_models::{ComparisonPair, ReconFileType};
+use crate::internal::shared_reconciler_rust_libraries::sdks::internal_microservices::view_models::requests::UploadFileChunkRequest;
 
-// use super::transformer::Transformer;
+//specifies the request, expected mock responses from dependencies and
+//the expected final method response for
+//a particular test case
+#[derive(Clone, Debug)]
+struct TestSpecifications {
+    request: (FileThatHasBeenRead, i64),
+    expected_final_result: Vec<UploadFileChunkRequest>,
+}
 
-// #[actix_web::test]
-// async fn test_transform_into_file_upload_chunk_returns_correct_model() {
-//     let to_entity_transformer = setup();
+//holds a number of test
+//cases testing different scenarios
+#[derive(Clone, Debug)]
+struct ValidRequestsTestScenarios {
+    ok_test: TestSpecifications,
+    is_max_rows_less_than_file_rows_handled_correctly: TestSpecifications,
+}
 
-//     let upload_file_chunk_request = get_dummy_upload_file_chunk_request();
-//     let recon_task_details = get_dummy_recon_task_details();
+#[test]
+fn test_group_rows_into_file_chunks() {
+    let valid_requests_test_suite = ValidRequestsTestScenarios {
+        ok_test: generate_ok_test_specification(),
+        is_max_rows_less_than_file_rows_handled_correctly: generate_is_max_rows_less_than_file_rows_handled_correctly_test_specification(),
+    };
 
-//     let actual = to_entity_transformer.transform_into_file_upload_chunk(
-//         upload_file_chunk_request.clone(),
-//         recon_task_details.clone(),
-//     );
+    rspec::run(&rspec::given("a FileThatHasBeenRead and max num of rows", valid_requests_test_suite, |ctx| {
+        ctx.when("the supplied max number of rows is MORE than those in the FileThatHasBeenRead", |ctx| {
+            ctx.then("correctly groups rows into One FileChunk", |env| {
+                let resp = setup_service_and_send_request(&env.ok_test.clone());
+                assert_eq!(resp.len(), env.ok_test.expected_final_result.clone().len());
+                assert_eq!(resp.last(), env.ok_test.expected_final_result.clone().last())
+            });
+        });
+        ctx.when("the supplied max number of rows is LESS than those in the FileThatHasBeenRead", |ctx| {
+            ctx.then("correctly groups rows into Two or more FileChunks", |env| {
+                let resp = setup_service_and_send_request(&env.is_max_rows_less_than_file_rows_handled_correctly.clone());
+                assert_eq!(resp.len(), env.is_max_rows_less_than_file_rows_handled_correctly.expected_final_result.clone().len());
+                assert_eq!(resp, env.is_max_rows_less_than_file_rows_handled_correctly.expected_final_result.clone())
+            });
+        });
+    }));
+}
 
-//     assert_eq!(
-//         actual.chunk_sequence_number,
-//         upload_file_chunk_request.chunk_sequence_number
-//     );
-// }
+fn generate_ok_test_specification() -> TestSpecifications {
+    TestSpecifications {
+        request: (get_dummy_request(), 200),
+        expected_final_result: vec![UploadFileChunkRequest {
+            upload_request_id: "RECON-TASK-1234".to_string(),
+            chunk_sequence_number: 1,
+            chunk_source: FileUploadChunkSource::PrimaryFileChunk,
+            chunk_rows: vec![
+                FileRow {
+                    raw_data: "001,2000".to_string(),
+                    row_number: 1,
+                },
+                FileRow {
+                    raw_data: "001,4000".to_string(),
+                    row_number: 2,
+                },
+            ],
+            is_last_chunk: true,
+        }],
+    }
+}
 
-// fn setup() -> Transformer {
-//     let to_entity_transformer = Transformer {};
-//     return to_entity_transformer;
-// }
+fn generate_is_max_rows_less_than_file_rows_handled_correctly_test_specification() -> TestSpecifications {
+    TestSpecifications {
+        request: (get_dummy_request(), 1),
+        expected_final_result: vec![
+            UploadFileChunkRequest {
+                upload_request_id: "RECON-TASK-1234".to_string(),
+                chunk_sequence_number: 1,
+                chunk_source: FileUploadChunkSource::PrimaryFileChunk,
+                chunk_rows: vec![
+                    FileRow {
+                        raw_data: "001,2000".to_string(),
+                        row_number: 1,
+                    },
+                ],
+                is_last_chunk: false,
+            },
+            UploadFileChunkRequest {
+                upload_request_id: "RECON-TASK-1234".to_string(),
+                chunk_sequence_number: 2,
+                chunk_source: FileUploadChunkSource::PrimaryFileChunk,
+                chunk_rows: vec![
+                    FileRow {
+                        raw_data: "001,4000".to_string(),
+                        row_number: 2,
+                    },
+                ],
+                is_last_chunk: true,
+            },
+        ],
+    }
+}
 
-// fn get_dummy_upload_file_chunk_request() -> UploadFileChunkRequest {
-//     UploadFileChunkRequest {
-//         upload_request_id: String::from("TEST-UPLOAD-1"),
-//         chunk_sequence_number: 1,
-//         chunk_source: FileUploadChunkSource::ComparisonFileChunk,
-//         chunk_rows: vec![],
-//         is_last_chunk: false,
-//     }
-// }
 
-// fn get_dummy_recon_task_details() -> ReconTaskResponseDetails {
-//     ReconTaskResponseDetails {
-//         task_id: String::from("TEST-UPLOAD-1"),
-//         task_details: ReconTaskDetails {
-//             id: String::from("task-1234"),
-//             primary_file_id: String::from("src-file-1234"),
-//             comparison_file_id: String::from("cmp-file-1234"),
-//             is_done: false,
-//             has_begun: true,
-//             comparison_pairs: vec![],
-//             recon_config: ReconciliationConfigs {
-//                 should_check_for_duplicate_records_in_comparison_file: true,
-//                 should_reconciliation_be_case_sensitive: true,
-//                 should_ignore_white_space: true,
-//                 should_do_reverse_reconciliation: true,
-//             },
-//             recon_results_queue_info: FileChunkQueue {
-//                 topic_id: String::from("recon-results-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//         primary_file_metadata: ReconFileMetaData {
-//             id: String::from("src-file-1234"),
-//             file_name: String::from("src-file-1234"),
-//             row_count: 1000,
-//             column_delimiters: vec![],
-//             recon_file_type: ReconFileType::PrimaryFile,
-//             column_headers: vec![],
-//             file_hash: String::from("src-file-1234"),
-//             queue_info: FileChunkQueue {
-//                 topic_id: String::from("src-file-chunks-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//         comparison_file_metadata: ReconFileMetaData {
-//             id: String::from("cmp-file-1234"),
-//             file_name: String::from("cmp-file-1234"),
-//             row_count: 1000,
-//             column_delimiters: vec![],
-//             recon_file_type: ReconFileType::ComparisonFile,
-//             column_headers: vec![],
-//             file_hash: String::from("cmp-file-1234"),
-//             queue_info: FileChunkQueue {
-//                 topic_id: String::from("cmp-file-chunks-queue-1"),
-//                 last_acknowledged_id: Option::None,
-//             },
-//         },
-//     }
-// }
+fn setup_service_and_send_request(test_specifications: &TestSpecifications) -> Vec<UploadFileChunkRequest> {
+    let sut = Transformer {};
+    let (file_that_has_been_read, max_rows_per_group) = test_specifications.request.clone();
+    let result = sut.group_rows_into_file_chunks(&file_that_has_been_read, max_rows_per_group);
+    return result;
+}
+
+fn get_dummy_request() -> FileThatHasBeenRead {
+    FileThatHasBeenRead {
+        id: None,
+        upload_request_id: Some("RECON-TASK-1234".to_string()),
+        file_type: ReconFileType::PrimaryFile,
+        column_headers: vec![
+            String::from("record_id"),
+            String::from("transaction_amount"),
+        ],
+        file_rows: vec![
+            FileRow {
+                raw_data: "001,2000".to_string(),
+                row_number: 1,
+            },
+            FileRow {
+                raw_data: "001,4000".to_string(),
+                row_number: 2,
+            },
+        ],
+
+        file_metadata: Some(FileMetadata {
+            column_delimiters: Some(vec![',']),
+            comparison_pairs: Some(vec![ComparisonPair {
+                primary_file_column_index: 0,
+                comparison_file_column_index: 0,
+                is_row_identifier: true,
+            }]),
+        }),
+    }
+}
