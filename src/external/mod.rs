@@ -1,2 +1,2 @@
-pub mod services;
+pub mod connectors;
 pub mod readers;

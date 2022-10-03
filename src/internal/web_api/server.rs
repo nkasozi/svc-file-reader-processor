@@ -1,7 +1,7 @@
 use actix_web::{App, HttpServer, web::Data};
 
 use crate::{
-    external::services::{
+    external::connectors::{
         file_chunks_upload_service_connector::FileChunksUploadHandlerServiceConnector,
         recon_tasks_service_connector::ReconTasksServiceConnector,
     },
@@ -22,7 +22,7 @@ use crate::internal::shared_reconciler_rust_libraries::sdks::internal_microservi
 
 // constants
 const DEFAULT_RECON_TASKS_SERVICE_CONNECTION_URL: &'static str = "http://localhost:3500";
-const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_CONNECTION_URL: &'static str = "http://localhost:8084";
+const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_CONNECTION_URL: &'static str = "http://localhost:3600";
 const DEFAULT_APP_LISTEN_IP: &'static str = "0.0.0.0";
 const DEFAULT_APP_LISTEN_PORT: u16 = 8082;
 const DEFAULT_FILE_CHUNKS_UPLOAD_SERVICE_NAME: &'static str = "svc-file-chunks-upload-manager";

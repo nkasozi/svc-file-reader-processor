@@ -16,6 +16,7 @@ A Dapr MicroService that provides CRUD functionality for ReconTasks.
 Clone the repo
 
 ### Prerequisites
+
 ```
 - Dapr
 - Rust
@@ -49,34 +50,44 @@ Run the app
 cargo run
 ```
 
-Sample Create ReconTasks Request
+Sample Read Primary File Request
 
 ```
-curl --location --request POST 'http://127.0.0.1:8080/task-details' \
+curl --location --request POST 'http://localhost:8082/read-file' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "user_id": "test-user-id",
-    "source_file_name": "test-src-file",
-    "source_file_hash": "test-src-file-hash",
-    "source_file_row_count": 25,
-    "source_file_column_count": 10,
-    "comparison_file_name": "test-cmp-file",
-    "comparison_file_hash": "test-cmp-file-hash",
-    "comparison_file_column_count": 30,
-    "comparison_file_row_count": 10,
-    "recon_configurations": {
-        "should_check_for_duplicate_records_in_comparison_file": false,
-        "should_reconciliation_be_case_sensitive": false,
-        "should_ignore_white_space": true,
-        "should_do_reverse_reconciliation": false
-    },
-    "comparison_pairs": []
+    "file": {
+        "file_storage_location": "LocalFileSystem",
+        "file_extension": "Csv",
+        "file_path": "E:\\Work\\cplk\\primary_file.csv",
+        "file_type": "PrimaryFile",
+        "file_metadata": {
+            "comparison_pairs": [
+                {
+                    "primary_file_column_index": 0,
+                    "comparison_file_column_index": 0,
+                    "is_row_identifier": true
+                }
+            ]
+        }
+    }
 }'
 ```
 
-GET previously created task 
+Sample Read Comparison File Request
+
 ```
-curl --location --request GET 'http://127.0.0.1:8080/task-details/RECON-TASK-05aecf16-cf0a-40f6-8af7-fd6ef7e89d70'
+curl --location --request POST 'http://localhost:8082/read-file' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "file": {
+        "file_storage_location": "LocalFileSystem",
+        "file_extension": "Csv",
+        "file_path": "E:\\Work\\cplk\\primary_file.csv",
+        "file_type": "ComparisonFile",
+        "upload_request_id": "RECON-TASK-10f5c31a-515e-42f9-8151-86eba2cacce8"
+    }
+}'
 ```
 
 ## Usage <a name = "usage"></a>
